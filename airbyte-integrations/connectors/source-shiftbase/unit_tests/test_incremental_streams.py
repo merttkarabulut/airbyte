@@ -1,3 +1,7 @@
+#
+# Copyright (c) 2026 Airbyte, Inc., all rights reserved.
+#
+
 import pytest
 from source_shiftbase.streams import Absentees, Availabilities, IncrementalShiftbaseStream
 
