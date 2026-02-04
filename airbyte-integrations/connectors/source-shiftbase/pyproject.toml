@@ -16,7 +16,7 @@ packages = [ { include = "source_shiftbase" }, {include = "main.py" } ]
 
 [tool.poetry.dependencies]
 python = "^3.10,<3.14"
-airbyte-cdk = "^6"
+airbyte-cdk = "^7"
 
 [tool.poetry.scripts]
 source-shiftbase = "source_shiftbase.run:run"
