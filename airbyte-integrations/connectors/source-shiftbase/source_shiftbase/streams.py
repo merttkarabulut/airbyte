@@ -736,7 +736,6 @@ class TimesheetDetailReport(ShiftbaseStream):
         stream_slice: Mapping[str, Any] = None,
         next_page_token: Mapping[str, Any] = None,
     ) -> Optional[Mapping[str, Any]]:
-
         date_to_use = self.current_date
         if next_page_token and "current_date" in next_page_token:
             date_to_use = next_page_token["current_date"]
@@ -823,7 +822,6 @@ class ScheduleDetailReport(ShiftbaseStream):
     def request_body_json(
         self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> Optional[Mapping[str, Any]]:
-
         date_to_use = self.current_date
         if next_page_token and "current_date" in next_page_token:
             date_to_use = next_page_token["current_date"]
