@@ -14,11 +14,9 @@ import requests
 from requests.auth import AuthBase
 
 from airbyte_cdk.models import SyncMode
-from airbyte_cdk.sources.streams.call_rate import APIBudget
 from airbyte_cdk.sources.streams.core import Stream
 from airbyte_cdk.sources.streams.http import HttpStream
-from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
-from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException, UserDefinedBackoffException
+from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException
 
 
 logger = logging.getLogger("airbyte")
@@ -53,10 +51,9 @@ class ShiftbaseStream(HttpStream, ABC):
         self,
         accounts: List[dict],
         start_date: str,
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(authenticator, api_budget)
+        super().__init__(authenticator=authenticator)
         self.accounts = accounts
         self.start_date = start_date
         self._rate_limit_remaining = 180  # Default rate limit
@@ -178,10 +175,9 @@ class Employees(ShiftbaseStream):
         accounts: List[dict],
         start_date: str,
         department_ids: List[dict],
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(accounts, start_date, authenticator, api_budget)
+        super().__init__(accounts, start_date, authenticator)
         self.department_ids = department_ids
         self.current_department_index = 0
         self.current_department = self.department_ids[0] if self.department_ids else None
@@ -279,10 +275,9 @@ class EmployeeTimeDistribution(ShiftbaseStream):
         accounts: List[dict],
         start_date: str,
         employee_ids: List,
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(accounts, start_date, authenticator, api_budget)
+        super().__init__(accounts, start_date, authenticator)
         # Employee handling
         self.employee_ids = [eid for eid in employee_ids if eid is not None]  # Filter out None values
         self.current_employee_index = 0
@@ -659,10 +654,9 @@ class EmployeesReport(ShiftbaseStream):
         self,
         accounts: List[dict],
         start_date: str,
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(accounts, start_date, authenticator, api_budget)
+        super().__init__(accounts, start_date, authenticator)
 
     def path(self, **kwargs) -> str:
         return "reports/users"
@@ -721,10 +715,9 @@ class TimesheetDetailReport(ShiftbaseStream):
         self,
         accounts: List[dict],
         start_date: str,
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(accounts, start_date, authenticator, api_budget)
+        super().__init__(accounts, start_date, authenticator)
         self.current_date = self.start_date
 
     def path(self, **kwargs) -> str:
@@ -810,10 +803,9 @@ class ScheduleDetailReport(ShiftbaseStream):
         self,
         accounts: List[dict],
         start_date: str,
-        authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None,
+        authenticator: Optional[AuthBase] = None,
     ):
-        super().__init__(accounts, start_date, authenticator, api_budget)
+        super().__init__(accounts, start_date, authenticator)
         self.current_date = self.start_date
 
     def path(self, **kwargs) -> str:
