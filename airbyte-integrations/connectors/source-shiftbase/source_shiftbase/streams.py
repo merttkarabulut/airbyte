@@ -1,26 +1,30 @@
-from abc import ABC
-from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Tuple
-import time
-import logging
-from datetime import datetime, timedelta
 import json
+import logging
 import os
+import time
+from abc import ABC
+from datetime import datetime, timedelta
+from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Tuple
 
+import requests
+from requests.auth import AuthBase
+
+from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.call_rate import APIBudget
+from airbyte_cdk.sources.streams.core import Stream
+from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException, UserDefinedBackoffException
-import requests
-from airbyte_cdk.sources.streams.http import HttpStream
-from requests.auth import AuthBase
-from airbyte_cdk.models import SyncMode
-from airbyte_cdk.sources.streams.core import Stream
+
 
 logger = logging.getLogger("airbyte")
+
 
 class ShiftbaseStream(HttpStream, ABC):
     """
     API Docs: https://developer.shiftbase.com/docs/core/59f133358c1fd-shiftbase-api
     """
+
     url_base = "https://api.shiftbase.com/api/"
     # Maximum number of retries for recoverable errors
     max_retries = 5
@@ -37,7 +41,7 @@ class ShiftbaseStream(HttpStream, ABC):
         stream = super().as_airbyte_stream()
         stream.supported_sync_modes = [SyncMode(mode) for mode in self.supported_sync_modes]
         stream.source_defined_cursor = self.source_defined_cursor
-        if hasattr(self, 'cursor_field'):
+        if hasattr(self, "cursor_field"):
             stream.default_cursor_field = [self.cursor_field]
         return stream
 
@@ -46,14 +50,14 @@ class ShiftbaseStream(HttpStream, ABC):
         accounts: List[dict],
         start_date: str,
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(authenticator, api_budget)
         self.accounts = accounts
         self.start_date = start_date
         self._rate_limit_remaining = 180  # Default rate limit
         self._rate_limit_reset = None
-        
+
         # Initialize account iteration
         self.current_account_index = 0
         self.current_account = self.accounts[0]
@@ -79,7 +83,7 @@ class ShiftbaseStream(HttpStream, ABC):
         self._update_rate_limits(response)
 
         # Check for Retry-After header first
-        retry_after = response.headers.get('Retry-After')
+        retry_after = response.headers.get("Retry-After")
         if retry_after:
             return float(retry_after)
 
@@ -102,12 +106,12 @@ class ShiftbaseStream(HttpStream, ABC):
         Updates internal rate limit tracking based on response headers.
         """
         try:
-            if 'X-RateLimit-Remaining' in response.headers:
-                self._rate_limit_remaining = int(response.headers['X-RateLimit-Remaining'])
-            
-            if 'X-RateLimit-Reset' in response.headers:
-                self._rate_limit_reset = int(response.headers['X-RateLimit-Reset'])
-                
+            if "X-RateLimit-Remaining" in response.headers:
+                self._rate_limit_remaining = int(response.headers["X-RateLimit-Remaining"])
+
+            if "X-RateLimit-Reset" in response.headers:
+                self._rate_limit_reset = int(response.headers["X-RateLimit-Reset"])
+
             # Log rate limit information
             if self._rate_limit_remaining < 20:  # Warning threshold
                 logger.warning(
@@ -121,21 +125,15 @@ class ShiftbaseStream(HttpStream, ABC):
         self,
         stream_state: Mapping[str, Any] | None,
         stream_slice: Mapping[str, Any] | None = None,
-        next_page_token: Mapping[str, Any] | None = None
+        next_page_token: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
-        return {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": f"API {self.access_token}"
-        }
-
-
+        return {"Content-Type": "application/json", "Accept": "application/json", "Authorization": f"API {self.access_token}"}
 
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
     ) -> MutableMapping[str, Any]:
         return {
-            "min_date": self.start_date # If not present the current day will be used.
+            "min_date": self.start_date  # If not present the current day will be used.
         }
 
     def read_records(self, *args, **kwargs) -> Iterable[Mapping[str, Any]]:
@@ -167,6 +165,7 @@ class Employees(ShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/75d0181c0add8-list-employees-in-department
     """
+
     primary_key = "id"
     # Inherits supported_sync_modes from ShiftbaseStream
 
@@ -176,7 +175,7 @@ class Employees(ShiftbaseStream):
         start_date: str,
         department_ids: List[dict],
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(accounts, start_date, authenticator, api_budget)
         self.department_ids = department_ids
@@ -197,28 +196,28 @@ class Employees(ShiftbaseStream):
         """
         try:
             response_json = response.json()
-            
+
             if response.status_code != 200:
                 logger.error(f"Error response from employees endpoint: {response_json}")
                 return []
 
-            data = response_json.get('data')
+            data = response_json.get("data")
             if not data:
                 logger.warning("No data found in response")
                 return []
-            
+
             for record in data:
                 if not isinstance(record, dict):
                     logger.warning(f"Skipping non-dictionary record: {record}")
                     continue
 
                 # Add required fields to the record
-                record['department_id'] = self.current_department['id']
-                record['account_name'] = self.current_account['account_name']
-                
+                record["department_id"] = self.current_department["id"]
+                record["account_name"] = self.current_account["account_name"]
+
                 # Rename fields to match schema
-                if 'teamId' in record:
-                    record['team_id'] = record.pop('teamId')
+                if "teamId" in record:
+                    record["team_id"] = record.pop("teamId")
 
                 yield record
 
@@ -238,14 +237,14 @@ class Employees(ShiftbaseStream):
             self.current_department_index += 1
             self.current_department = self.department_ids[self.current_department_index]
             # If we're switching to a department from a different account, update the access token
-            if self.current_department['account_name'] != self.current_account['account_name']:
+            if self.current_department["account_name"] != self.current_account["account_name"]:
                 for account in self.accounts:
-                    if account['account_name'] == self.current_department['account_name']:
+                    if account["account_name"] == self.current_department["account_name"]:
                         self.current_account = account
-                        self.access_token = account['access_token']
+                        self.access_token = account["access_token"]
                         break
             return {"department_index": self.current_department_index}
-        
+
         # If we've processed all departments, try next account
         self.current_department_index = 0  # Reset department index
         if self.department_ids:  # Reset current department if we have departments
@@ -259,7 +258,7 @@ class Employees(ShiftbaseStream):
         if not self.department_ids:
             logger.warning("No departments available to fetch employees from")
             return []
-        
+
         yield from super().read_records(*args, **kwargs)
 
 
@@ -267,6 +266,7 @@ class EmployeeTimeDistribution(ShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/9ceb4dce3acb8-list-employee-time-distribution
     """
+
     primary_key = "employeeId"
     # Inherits supported_sync_modes from ShiftbaseStream
 
@@ -276,7 +276,7 @@ class EmployeeTimeDistribution(ShiftbaseStream):
         start_date: str,
         employee_ids: List,
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(accounts, start_date, authenticator, api_budget)
         # Employee handling
@@ -350,18 +350,20 @@ class EmployeeTimeDistribution(ShiftbaseStream):
         """
         try:
             response_json = response.json()
-            
+
             if response.status_code != 200:
                 logger.error(f"Error response from time distribution endpoint: {response_json}")
                 return []
 
-            data = response_json.get('data', {})
+            data = response_json.get("data", {})
             if data:
-                data.update({
-                    'account_name': self.current_account['account_name'],
-                    'employee_id': self.current_employee,
-                    'year': self.current_year_index
-                })
+                data.update(
+                    {
+                        "account_name": self.current_account["account_name"],
+                        "employee_id": self.current_employee,
+                        "year": self.current_year_index,
+                    }
+                )
                 yield data
 
         except Exception as e:
@@ -376,14 +378,16 @@ class EmployeeTimeDistribution(ShiftbaseStream):
         if not self.employee_ids:
             logger.warning("No employee IDs available for time distribution")
             return []
-        
+
         yield from super().read_records(*args, **kwargs)
+
 
 # Basic incremental stream
 class IncrementalShiftbaseStream(ShiftbaseStream, ABC):
     """
     Base class for implementing incremental streams for Shiftbase connector.
     """
+
     state_checkpoint_interval = 100
     cursor_field = None
     # Add incremental sync mode for incremental streams
@@ -396,15 +400,15 @@ class IncrementalShiftbaseStream(ShiftbaseStream, ABC):
         State is maintained per account.
         """
         current_stream_state = current_stream_state or {}
-        account_name = latest_record['account_name']
-        
+        account_name = latest_record["account_name"]
+
         # Initialize account state if not present
         if account_name not in current_stream_state:
             current_stream_state[account_name] = {self.cursor_field: self.start_date}
-            
+
         latest_record_value = latest_record.get(self.cursor_field, self.start_date)
         current_account_value = current_stream_state[account_name].get(self.cursor_field, self.start_date)
-        
+
         current_stream_state[account_name][self.cursor_field] = max(latest_record_value, current_account_value)
         return current_stream_state
 
@@ -416,12 +420,12 @@ class IncrementalShiftbaseStream(ShiftbaseStream, ABC):
         Uses per-account state for filtering.
         """
         params = super().request_params(stream_state, stream_slice, next_page_token)
-        
+
         # Only include state filter if we have stream state for current account
-        if stream_state and self.current_account['account_name'] in stream_state:
-            account_state = stream_state[self.current_account['account_name']]
+        if stream_state and self.current_account["account_name"] in stream_state:
+            account_state = stream_state[self.current_account["account_name"]]
             params["min_date"] = account_state.get(self.cursor_field, self.start_date)
-        
+
         return params
 
 
@@ -429,6 +433,7 @@ class Departments(ShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/510254d159b47-list-departments
     """
+
     primary_key = "id"
 
     def path(self, **kwargs) -> str:
@@ -441,21 +446,21 @@ class Departments(ShiftbaseStream):
         try:
             response_json = response.json()
             logger.debug(f"Departments response: {response_json}")
-            
+
             if response.status_code != 200:
                 logger.error(f"Error response from departments endpoint: {response_json}")
                 return []
 
-            data = response_json.get('data', [])
+            data = response_json.get("data", [])
             if not data:
                 logger.warning(f"No departments found in response: {response_json}")
                 return []
 
             for record in data:
-                department = record.get('Department', record)
+                department = record.get("Department", record)
                 if department:
                     # Add account_name to the department data
-                    department['account_name'] = self.current_account['account_name']
+                    department["account_name"] = self.current_account["account_name"]
                     yield department
                 else:
                     logger.warning(f"Could not extract department data from record: {record}")
@@ -470,6 +475,7 @@ class Absentees(IncrementalShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/2e1fba402f9bb-list-absentees
     """
+
     primary_key = "id"
     cursor_field = "updated"
     # Inherits supported_sync_modes from IncrementalShiftbaseStream
@@ -483,13 +489,13 @@ class Absentees(IncrementalShiftbaseStream):
         """
         response_json = response.json()
         logger.debug(f"Absentees response: {response_json}")  # Debug logging
-        
-        data = response_json.get('data', [])
+
+        data = response_json.get("data", [])
         for record in data:
-            absentee = record.get('Absentee', {})
+            absentee = record.get("Absentee", {})
             if absentee:
                 # Add account_name to the absentee data
-                absentee['account_name'] = self.current_account['account_name']
+                absentee["account_name"] = self.current_account["account_name"]
                 yield absentee
 
 
@@ -497,6 +503,7 @@ class Availabilities(IncrementalShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/0b8b4f51ba73a-list-availabilities
     """
+
     primary_key = "id"
     cursor_field = "date"
     # Inherits supported_sync_modes from IncrementalShiftbaseStream
@@ -513,20 +520,20 @@ class Availabilities(IncrementalShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from availabilities endpoint: {response_json}")
                 return []
-            
+
             response_json = response.json()
-            data = response_json.get('data', [])
+            data = response_json.get("data", [])
 
             # Process records
             for record in data:
                 try:
-                    availability = record.get('Availability', {})
+                    availability = record.get("Availability", {})
                     if not availability:
                         logger.warning(f"No Availability data found in record: {record}")
                         continue
 
                     # Add account_name to the availability data
-                    availability['account_name'] = self.current_account['account_name']
+                    availability["account_name"] = self.current_account["account_name"]
                     yield availability
 
                 except Exception as record_error:
@@ -549,6 +556,7 @@ class Shifts(ShiftbaseStream):
     """
     API Docs: https://developer.shiftbase.com/docs/core/c8dbe25e28719-list-shifts
     """
+
     primary_key = "id"
 
     def path(self, **kwargs) -> str:
@@ -563,14 +571,14 @@ class Shifts(ShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from shifts endpoint: {response_json}")
                 return []
-            
-            data = response_json.get('data', [])
-            
+
+            data = response_json.get("data", [])
+
             for record in data:
                 # Handle potentially wrapped record
-                shift = record.get('Shift', record)
+                shift = record.get("Shift", record)
                 if shift:
-                    shift['account_name'] = self.current_account['account_name']
+                    shift["account_name"] = self.current_account["account_name"]
                     yield shift
                 else:
                     logger.warning(f"Could not extract shift data from record: {record}")
@@ -587,6 +595,7 @@ class Users(ShiftbaseStream):
     Inherits from ShiftbaseStream which handles the authentication and base URL.
     Incremental sync is not supported for this stream due to modified/updated request parameter not being available.
     """
+
     primary_key = "id"
 
     def path(self, **kwargs) -> str:
@@ -601,13 +610,13 @@ class Users(ShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from users endpoint: {response_json}")
                 return []
-            
-            data = response_json.get('data', [])
-            
+
+            data = response_json.get("data", [])
+
             for record in data:
-                user_record = record.get('User')
+                user_record = record.get("User")
                 if user_record:
-                    user_record['account_name'] = self.current_account['account_name']
+                    user_record["account_name"] = self.current_account["account_name"]
                     yield user_record
                 else:
                     logger.warning(f"Could not extract user data from record: {record}")
@@ -616,7 +625,7 @@ class Users(ShiftbaseStream):
             logger.error(f"Error parsing users response: {e}")
             logger.error(f"Response content: {response.text}")
             raise
-    
+
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
     ) -> MutableMapping[str, Any]:
@@ -624,7 +633,7 @@ class Users(ShiftbaseStream):
         Overwrite request_params to remove min_date parameter. Not available for this stream.
         """
         return None
-    
+
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         """
         Does not support pagination.
@@ -638,6 +647,7 @@ class EmployeesReport(ShiftbaseStream):
     Inherits from ShiftbaseStream which handles the authentication and base URL.
     Incremental sync is not supported for this stream due to modified/updated request parameter not being available.
     """
+
     primary_key = "userId"
     http_method = "POST"
 
@@ -646,18 +656,15 @@ class EmployeesReport(ShiftbaseStream):
         accounts: List[dict],
         start_date: str,
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(accounts, start_date, authenticator, api_budget)
 
     def path(self, **kwargs) -> str:
         return "reports/users"
-    
+
     def request_body_json(self, **kwargs) -> Optional[Mapping[str, Any]]:
-        return {
-            "export": "json",
-            "from": self.start_date
-        }
+        return {"export": "json", "from": self.start_date}
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
         """
@@ -668,10 +675,10 @@ class EmployeesReport(ShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from employees report endpoint: {response_json}")
                 return []
-            
+
             for record in response_json:
                 if record:
-                    record['account_name'] = self.current_account['account_name']
+                    record["account_name"] = self.current_account["account_name"]
                     yield record
                 else:
                     logger.warning(f"Could not extract data from Employees Report record: {record}")
@@ -680,7 +687,7 @@ class EmployeesReport(ShiftbaseStream):
             logger.error(f"Error parsing employees report response: {e}")
             logger.error(f"Response content: {response.text}")
             raise
-    
+
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
     ) -> MutableMapping[str, Any]:
@@ -688,7 +695,7 @@ class EmployeesReport(ShiftbaseStream):
         Overwrite request_params to remove min_date parameter. Not available for this stream.
         """
         return None
-    
+
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         """
         Does not support pagination.
@@ -702,6 +709,7 @@ class TimesheetDetailReport(ShiftbaseStream):
     Inherits from ShiftbaseStream which handles the authentication and base URL.
     Incremental sync is not supported for this stream due to modified/updated request parameter not being available.
     """
+
     primary_key = "timesheetId"
     http_method = "POST"
 
@@ -710,30 +718,26 @@ class TimesheetDetailReport(ShiftbaseStream):
         accounts: List[dict],
         start_date: str,
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(accounts, start_date, authenticator, api_budget)
         self.current_date = self.start_date
 
     def path(self, **kwargs) -> str:
         return "reports/timesheet_detail"
-    
+
     def request_body_json(
         self,
         stream_state: Mapping[str, Any] = None,
         stream_slice: Mapping[str, Any] = None,
         next_page_token: Mapping[str, Any] = None,
     ) -> Optional[Mapping[str, Any]]:
-        
+
         date_to_use = self.current_date
         if next_page_token and "current_date" in next_page_token:
-             date_to_use = next_page_token["current_date"]
+            date_to_use = next_page_token["current_date"]
 
-        return {
-            "export": "json",
-            "from": date_to_use,
-            "to": date_to_use
-        }
+        return {"export": "json", "from": date_to_use, "to": date_to_use}
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
         """
@@ -744,10 +748,10 @@ class TimesheetDetailReport(ShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from timesheet detail report endpoint: {response_json}")
                 return []
-            
+
             for record in response_json:
                 if record:
-                    record['account_name'] = self.current_account['account_name']
+                    record["account_name"] = self.current_account["account_name"]
                     yield record
                 else:
                     logger.warning(f"Could not extract data from Timesheet Detail Report record: {record}")
@@ -756,7 +760,7 @@ class TimesheetDetailReport(ShiftbaseStream):
             logger.error(f"Error parsing timesheet detail report response: {e}")
             logger.error(f"Response content: {response.text}")
             raise
-    
+
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
     ) -> MutableMapping[str, Any]:
@@ -764,7 +768,7 @@ class TimesheetDetailReport(ShiftbaseStream):
         Overwrite request_params to remove min_date parameter. Not available for this stream.
         """
         return None
-    
+
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         """
         Iterate day-by-day and then switch to next account.
@@ -776,22 +780,16 @@ class TimesheetDetailReport(ShiftbaseStream):
 
         if next_date_dt <= today_dt:
             self.current_date = next_date_dt.strftime("%Y-%m-%d")
-            return {
-                "current_date": self.current_date,
-                "account_index": self.current_account_index
-            }
-        
+            return {"current_date": self.current_date, "account_index": self.current_account_index}
+
         # Else: Dates for current account exhausted. Move to next account.
         if self.current_account_index + 1 < len(self.accounts):
             self.current_account_index += 1
             self.current_account = self.accounts[self.current_account_index]
             self.access_token = self.current_account["access_token"]
             self.current_date = self.start_date
-            return {
-                "current_date": self.current_date,
-                "account_index": self.current_account_index
-            }
-            
+            return {"current_date": self.current_date, "account_index": self.current_account_index}
+
         return None
 
 
@@ -801,6 +799,7 @@ class ScheduleDetailReport(ShiftbaseStream):
     Inherits from ShiftbaseStream which handles the authentication and base URL.
     Incremental sync is not supported for this stream due to modified/updated request parameter not being available.
     """
+
     primary_key = "userId"
     http_method = "POST"
 
@@ -809,30 +808,23 @@ class ScheduleDetailReport(ShiftbaseStream):
         accounts: List[dict],
         start_date: str,
         authenticator: AuthBase | HttpAuthenticator | None = None,
-        api_budget: APIBudget | None = None
+        api_budget: APIBudget | None = None,
     ):
         super().__init__(accounts, start_date, authenticator, api_budget)
         self.current_date = self.start_date
 
     def path(self, **kwargs) -> str:
         return "reports/schedule_detail"
-    
+
     def request_body_json(
-        self,
-        stream_state: Mapping[str, Any] = None,
-        stream_slice: Mapping[str, Any] = None,
-        next_page_token: Mapping[str, Any] = None
+        self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> Optional[Mapping[str, Any]]:
-        
+
         date_to_use = self.current_date
         if next_page_token and "current_date" in next_page_token:
-             date_to_use = next_page_token["current_date"]
+            date_to_use = next_page_token["current_date"]
 
-        return {
-            "export": "json",
-            "from": date_to_use,
-            "to": date_to_use
-        }
+        return {"export": "json", "from": date_to_use, "to": date_to_use}
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
         """
@@ -843,10 +835,10 @@ class ScheduleDetailReport(ShiftbaseStream):
             if response.status_code != 200:
                 logger.error(f"Error response from schedule detail report endpoint: {response_json}")
                 return []
-            
+
             for record in response_json:
                 if record:
-                    record['account_name'] = self.current_account['account_name']
+                    record["account_name"] = self.current_account["account_name"]
                     yield record
                 else:
                     logger.warning(f"Could not extract data from Schedule Detail Report record: {record}")
@@ -855,15 +847,15 @@ class ScheduleDetailReport(ShiftbaseStream):
             logger.error(f"Error parsing schedule detail report response: {e}")
             logger.error(f"Response content: {response.text}")
             raise
-    
+
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
-    ) ->MutableMapping[str, Any]:
+    ) -> MutableMapping[str, Any]:
         """
         Overwrite request_params to remove min_date parameter. Not available for this stream.
         """
         return None
-    
+
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         """
         Iterate day-by-day and then switch to next account.
@@ -875,20 +867,14 @@ class ScheduleDetailReport(ShiftbaseStream):
 
         if next_date_dt <= today_dt:
             self.current_date = next_date_dt.strftime("%Y-%m-%d")
-            return {
-                "current_date": self.current_date,
-                "account_index": self.current_account_index
-            }
-        
+            return {"current_date": self.current_date, "account_index": self.current_account_index}
+
         # Else: Dates for current account exhausted. Move to next account.
         if self.current_account_index + 1 < len(self.accounts):
             self.current_account_index += 1
             self.current_account = self.accounts[self.current_account_index]
             self.access_token = self.current_account["access_token"]
             self.current_date = self.start_date
-            return {
-                "current_date": self.current_date,
-                "account_index": self.current_account_index
-            }
-            
+            return {"current_date": self.current_date, "account_index": self.current_account_index}
+
         return None

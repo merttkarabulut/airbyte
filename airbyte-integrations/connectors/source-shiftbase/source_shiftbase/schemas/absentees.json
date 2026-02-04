@@ -125,16 +125,10 @@
             "type": "string"
           },
           "wait_hours_balance_id": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "time_off_balance_id": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": ["null", "string"]
           },
           "salary": {
             "type": "integer"

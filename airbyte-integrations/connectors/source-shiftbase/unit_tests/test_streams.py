@@ -1,12 +1,11 @@
-
 from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import pytest
 from source_shiftbase.streams import (
-    ShiftbaseStream,
-    Departments,
     Absentees,
+    Departments,
+    ShiftbaseStream,
     Shifts,
 )
 
@@ -14,12 +13,7 @@ from source_shiftbase.streams import (
 @pytest.fixture
 def mock_accounts():
     """Fixture providing mock account configuration."""
-    return [
-        {
-            "access_token": "test_token_123",
-            "account_name": "test_account"
-        }
-    ]
+    return [{"access_token": "test_token_123", "account_name": "test_account"}]
 
 
 @pytest.fixture
@@ -60,12 +54,12 @@ def test_next_page_token_multiple_accounts(patch_base_class, mock_start_date):
     ]
     stream = ShiftbaseStream(accounts=accounts, start_date=mock_start_date)
     response_mock = MagicMock()
-    
+
     # First call should return next account token
     token = stream.next_page_token(response_mock)
     assert token == {"account_index": 1}
     assert stream.current_account["account_name"] == "account2"
-    
+
     # Second call should return None (no more accounts)
     assert stream.next_page_token(response_mock) is None
 
@@ -75,7 +69,7 @@ def test_request_headers(patch_base_class, mock_accounts, mock_start_date):
     stream = ShiftbaseStream(accounts=mock_accounts, start_date=mock_start_date)
     inputs = {"stream_slice": None, "stream_state": None, "next_page_token": None}
     headers = stream.request_headers(**inputs)
-    
+
     assert headers["Content-Type"] == "application/json"
     assert headers["Accept"] == "application/json"
     assert "Authorization" in headers
@@ -116,7 +110,7 @@ def test_backoff_time_rate_limit(patch_base_class, mock_accounts, mock_start_dat
     response_mock = MagicMock()
     response_mock.status_code = 429
     response_mock.headers = {"Retry-After": "60"}
-    
+
     backoff = stream.backoff_time(response_mock)
     assert backoff == 60.0
 
@@ -127,7 +121,7 @@ def test_backoff_time_server_error(patch_base_class, mock_accounts, mock_start_d
     response_mock = MagicMock()
     response_mock.status_code = 500
     response_mock.headers = {}
-    
+
     backoff = stream.backoff_time(response_mock)
     assert backoff == stream.default_retry_delay
 
@@ -138,7 +132,7 @@ def test_backoff_time_normal_response(patch_base_class, mock_accounts, mock_star
     response_mock = MagicMock()
     response_mock.status_code = 200
     response_mock.headers = {}
-    
+
     backoff = stream.backoff_time(response_mock)
     assert backoff is None
 
@@ -152,16 +146,13 @@ def test_departments_path(mock_accounts, mock_start_date):
 def test_departments_parse_response(mock_accounts, mock_start_date):
     """Test Departments stream parse_response."""
     stream = Departments(accounts=mock_accounts, start_date=mock_start_date)
-    
+
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "data": [
-            {"Department": {"id": "dept1", "name": "Engineering"}},
-            {"Department": {"id": "dept2", "name": "Sales"}}
-        ]
+        "data": [{"Department": {"id": "dept1", "name": "Engineering"}}, {"Department": {"id": "dept2", "name": "Sales"}}]
     }
-    
+
     records = list(stream.parse_response(mock_response))
     assert len(records) == 2
     assert records[0]["id"] == "dept1"
@@ -177,9 +168,9 @@ def test_shifts_path(mock_accounts, mock_start_date):
 def test_absentees_incremental_properties(mock_accounts, mock_start_date):
     """Test Absentees stream has incremental sync properties."""
     from airbyte_cdk.models import SyncMode
-    
+
     stream = Absentees(accounts=mock_accounts, start_date=mock_start_date)
-    
+
     assert stream.cursor_field == "updated"
     assert stream.source_defined_cursor is True
     assert SyncMode.incremental in stream.supported_sync_modes
