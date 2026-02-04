@@ -1,5 +1,11 @@
 data:
-  registries:
+  ab_internal:
+    ql: 100
+    sl: 100
+  allowedHosts:
+    hosts:
+      - api.shiftbase.com
+  registryOverrides:
     oss:
       enabled: true
     cloud:
