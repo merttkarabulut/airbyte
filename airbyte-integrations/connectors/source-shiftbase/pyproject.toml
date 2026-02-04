@@ -28,3 +28,8 @@ requests-mock = "*"
 pytest-mock = "*"
 pytest = "*"
 
+[tool.pytest.ini_options]
+# Skip the non-Docker test_spec test since it requires the module to be installed
+# The Docker-based test_docker_image_build_and_spec test validates the spec instead
+addopts = "-k 'not test_spec'"
+
