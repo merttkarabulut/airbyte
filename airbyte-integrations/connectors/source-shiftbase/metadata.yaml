@@ -23,7 +23,7 @@ data:
   connectorType: source
   definitionId: 4d338322-bf11-4eeb-93b7-7aae9e92bcf7
   dockerImageTag: 0.1.47
-  dockerRepository: mr-marvis/source-shiftbase
+  dockerRepository: airbyte/source-shiftbase
   githubIssueLabel: source-shiftbase
   icon: icon.svg
   license: MIT
@@ -35,4 +35,6 @@ data:
   tags:
     - language:python
     - cdk:python
+  connectorTestSuitesOptions:
+    - suite: unitTests
 metadataSpecVersion: "1.0"
