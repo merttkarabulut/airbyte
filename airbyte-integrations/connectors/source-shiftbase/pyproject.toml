@@ -28,6 +28,13 @@ requests-mock = "*"
 pytest-mock = "*"
 pytest = "*"
 
+[tool.poe]
+include = [
+    # Shared tasks definition file(s) can be imported here.
+    # Run `poe` or `poe --help` to see the list of available tasks.
+    "${POE_GIT_DIR}/poe-tasks/poetry-connector-tasks.toml",
+]
+
 [tool.pytest.ini_options]
 # Skip the non-Docker test_spec test since it requires the module to be installed
 # The Docker-based test_docker_image_build_and_spec test validates the spec instead
