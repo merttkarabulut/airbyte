@@ -72,9 +72,8 @@ class ShiftbaseStream(HttpStream, ABC):
             return True
         elif response.status_code in [500, 502, 503, 504]:  # Server errors
             return True
-        elif response.status_code == 401:  # Unauthorized
-            return False  # Don't retry auth failures
-        return super().should_retry(response)
+        # Don't retry for other status codes (including 401 Unauthorized)
+        return False
 
     def backoff_time(self, response: requests.Response) -> Optional[float]:
         """
